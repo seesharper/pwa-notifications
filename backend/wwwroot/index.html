@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="appmanifest.json" />
+    <title>PWA App</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.js"></script>
+
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/myFirsthub")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+        async function startSignalR() {
+            try {
+                await connection.start();
+                console.log("SignalR Connected.");
+            } catch (err) {
+                console.log(err);
+                setTimeout(start, 5000);
+            }
+        };
+
+        connection.onclose(async () => {
+            await start();
+        });
+
+        connection.on("ReceiveMessage", (m) => {
+            console.log(`Got message `,m);
+            var message = document.createElement("li");
+            message.innerText = m
+            document.getElementById("receivedMessagesList").appendChild(message);
+        });
+
+        // Start the connection.
+        startSignalR();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(registration => {
+                    console.log('Service worker registered:', registration);
+                })
+                .catch(error => {
+                    console.error('Service worker registration failed:', error);
+                });
+            navigator.serviceWorker.dispatchEvent(new Event('push'));
+        }
+
+        function notify() {
+            console.log('onclick');
+            Notification.requestPermission().then((result) => {
+                if (result === "granted") {
+                    randomNotification();
+                }
+            });
+        }
+
+        function randomNotification() {
+            const notifTitle = "SomeTitle"
+            const notifBody = `Created by me`;
+            const options = {
+                body: notifBody
+            };
+            new Notification(notifTitle, options);
+            // setTimeout(randomNotification, 30000);
+        }
+
+        window.onload = function(){
+            console.log(document.getElementById("messageInput"));
+            document.getElementById("sendMessageButton").addEventListener("click", function(event){
+                let el = document.getElementById("messageInput");
+                let text = el.value;
+                if(!text) return;
+                el.value = "";
+                console.log(text);
+                connection.invoke("SendMessageToAllClients", text)
+                    .then(r => {
+                        console.log(`Response is ${r}`);
+                    }).catch(e => {
+                        console.log(`Got error`, e);
+                    });
+
+            });
+        }
+        
+    </script>
+</head>
+
+<body>
+    <h1>PWA App</h1>
+    <button onclick="notify()">Click me</button>
+    <p>This is a simple PWA app that responds to the activate event.</p>
+
+    <h2>My cozy message app</h2>
+    <textarea id="messageInput">
+    </textarea>
+    <button id="sendMessageButton">Send</button>
+
+    <h3>My received messages</h3>
+    <ul id="receivedMessagesList">
+    </ul>
+
+</body>
+
+</html>
